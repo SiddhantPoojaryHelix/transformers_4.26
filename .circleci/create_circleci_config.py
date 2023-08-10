@@ -64,7 +64,7 @@ class CircleCIJob:
     working_directory: str = "~/transformers"
     # This should be only used for doctest job!
     command_timeout: Optional[int] = None
-    checksum = Optional[str] = None
+    checksum: Optional[str] = None
 
     def __post_init__(self):
         # Deal with defaults for mutable attributes.
