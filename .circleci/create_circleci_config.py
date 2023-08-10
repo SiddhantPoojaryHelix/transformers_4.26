@@ -107,8 +107,11 @@ class CircleCIJob:
             job["parallelism"] = self.parallelism
 
         checksum = self.checksum if self.checksum is not None else '{{ checksum "setup.py" }}'
-        # if `setup.py` is not modified, we only use `main` branch
+        # if `setup.py` is not modified, we use the cache created by the latest commit on the `main` branch
+        save_cache = True
         if self.checksum is not None:
+            if cache_branch_prefix == "pull":
+                save_cache = False
             cache_branch_prefix = "main"
 
         steps = [
@@ -137,22 +140,23 @@ class CircleCIJob:
             },
         ]
         steps.extend([{"run": l} for l in self.install_steps])
-        steps.append(
-            {
-                "save_cache": {
-                    "key": f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-pip-{checksum}",
-                    "paths": ["~/.cache/pip"],
+        if save_cache:
+            steps.append(
+                {
+                    "save_cache": {
+                        "key": f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-pip-{checksum}",
+                        "paths": ["~/.cache/pip"],
+                    }
                 }
-            }
-        )
-        steps.append(
-            {
-                "save_cache": {
-                    "key": f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-site-packages-{checksum}",
-                    "paths": ["~/.pyenv/versions/"],
+            )
+            steps.append(
+                {
+                    "save_cache": {
+                        "key": f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-site-packages-{checksum}",
+                        "paths": ["~/.pyenv/versions/"],
+                    }
                 }
-            }
-        )
+            )
         steps.append({"run": {"name": "Show installed libraries and their versions", "command": "pip freeze | tee installed.txt"}})
         steps.append({"store_artifacts": {"path": "~/transformers/installed.txt"}})
 
