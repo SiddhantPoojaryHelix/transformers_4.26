@@ -18,6 +18,7 @@ import copy
 import glob
 import os
 import random
+import subprocess
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -104,7 +105,7 @@ class CircleCIJob:
 
         checksum = self.checksum if self.checksum is not None else '{{ checksum "setup.py" }}'
         # if `setup.py` is not modified, we only use `main` branch
-        if self.checksum is None:
+        if self.checksum is not None:
             cache_branch_prefix = "main"
 
         steps = [
@@ -554,9 +555,9 @@ def create_circleci_config(folder=None):
     checksum = None
     # `setup.py` is not modified
     if test_list != "tests":
-        # we use `setup.py` on the main branch to compute the checksum for the cache
-        from utils.get_repo_info import get_setup_checksum
-        checksum = get_setup_checksum()
+        # we use `setup.py` of the latest commit on the `main` branch to compute the checksum for the cache
+        proc = subprocess.Popen("python3 utils/get_repo_info.py", stdout=subprocess.PIPE)
+        checksum = proc.stdout.read().decode().split(" ")[0]
 
     jobs = []
     all_test_file = os.path.join(folder, "test_list.txt")
