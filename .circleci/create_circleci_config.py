@@ -557,7 +557,7 @@ def create_circleci_config(folder=None):
     if test_list != "tests":
         # we use `setup.py` of the latest commit on the `main` branch to compute the checksum for the cache
         proc = subprocess.Popen("python3 utils/get_repo_info.py", stdout=subprocess.PIPE)
-        checksum = proc.stdout.read().decode().split(" ")[0]
+        checksum = proc.stdout.read().decode().split()[0]
 
     jobs = []
     all_test_file = os.path.join(folder, "test_list.txt")
