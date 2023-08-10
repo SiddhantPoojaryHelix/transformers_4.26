@@ -548,7 +548,7 @@ DOC_TESTS = [doc_test_job]
 
 def get_main_setup_checksum():
 
-    PATH_TO_REPO = Path(__file__).parent.resolve()
+    PATH_TO_REPO = Path(__file__).parent.parent.resolve()
     repo = Repo(PATH_TO_REPO)
 
     current_head = repo.head.ref
