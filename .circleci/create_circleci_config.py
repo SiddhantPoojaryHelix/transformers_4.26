@@ -536,6 +536,20 @@ def create_circleci_config(folder=None):
         folder = os.getcwd()
     # Used in CircleCIJob.to_dict() to expand the test list (for using parallelism)
     os.environ["test_preparation_dir"] = folder
+
+    test_file = os.path.join(folder, "filtered_test_list.txt")
+    if os.path.exists(test_file):
+        with open(test_file) as f:
+            test_list = f.read()
+    else:
+        test_list = []
+    # This means either `setup.py` is modified or it's a nightly run
+    if test_list == "tests":
+        pass
+        # we want to use the (modified) `setup.py` on the branch to compute the checksum for the cache
+        # TODO: how do we compute the checksum of the `setup.py` on the main branch of the common commit with the branch
+        checksum = None
+
     jobs = []
     all_test_file = os.path.join(folder, "test_list.txt")
     if os.path.exists(all_test_file):
