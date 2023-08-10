@@ -19,10 +19,13 @@ import glob
 import os
 import random
 import subprocess
+import yaml
+from base64 import b64encode
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
+from git import Repo
 
 
 COMMON_ENV_VARIABLES = {
@@ -539,6 +542,25 @@ REPO_UTIL_TESTS = [repo_utils_job]
 DOC_TESTS = [doc_test_job]
 
 
+def get_main_setup_checksum():
+
+    PATH_TO_REPO = Path(__file__).parent.resolve()
+    repo = Repo(PATH_TO_REPO)
+
+    current_head = repo.head.ref
+    main_head = repo.refs.main
+
+    main_head.checkout()
+    proc = subprocess.Popen("sha256sum setup.py", stdout=subprocess.PIPE)
+    checksum = proc.stdout.read().decode().split(" ")[0]
+    checksum = b64encode(bytes.fromhex(checksum)).decode()
+
+    # go back to the original branch
+    current_head.checkout()
+
+    return checksum
+
+
 def create_circleci_config(folder=None):
     if folder is None:
         folder = os.getcwd()
@@ -555,9 +577,8 @@ def create_circleci_config(folder=None):
     checksum = None
     # `setup.py` is not modified
     if test_list != "tests":
-        # we use `setup.py` of the latest commit on the `main` branch to compute the checksum for the cache
-        proc = subprocess.Popen("python3 utils/get_repo_info.py", stdout=subprocess.PIPE)
-        checksum = proc.stdout.read().decode().split()[0]
+        # we use `setup.py` of the `latest` commit on the `main` branch to compute the checksum for the cache
+        checksum = get_main_setup_checksum()
 
     jobs = []
     all_test_file = os.path.join(folder, "test_list.txt")
