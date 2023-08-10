@@ -64,6 +64,7 @@ class CircleCIJob:
     working_directory: str = "~/transformers"
     # This should be only used for doctest job!
     command_timeout: Optional[int] = None
+    checksum = Optional[str] = None
 
     def __post_init__(self):
         # Deal with defaults for mutable attributes.
@@ -100,6 +101,12 @@ class CircleCIJob:
             job["resource_class"] = self.resource_class
         if self.parallelism is not None:
             job["parallelism"] = self.parallelism
+
+        checksum = self.checksum if self.checksum is not None else '{{ checksum "setup.py" }}'
+        # if `setup.py` is not modified, we only use `main` branch
+        if self.checksum is None:
+            cache_branch_prefix = "main"
+
         steps = [
             "checkout",
             {"attach_workspace": {"at": "~/transformers/test_preparation"}},
@@ -107,7 +114,7 @@ class CircleCIJob:
                 "restore_cache": {
                     "keys": [
                         # check the fully-matched cache first
-                        f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-pip-" + '{{ checksum "setup.py" }}',
+                        f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-pip-{checksum}",
                         # try the partially-matched cache from `main`
                         f"v{self.cache_version}-{self.cache_name}-main-pip-",
                         # try the general partially-matched cache
@@ -118,7 +125,7 @@ class CircleCIJob:
             {
                 "restore_cache": {
                     "keys": [
-                        f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-site-packages-" + '{{ checksum "setup.py" }}',
+                        f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-site-packages-{checksum}",
                         f"v{self.cache_version}-{self.cache_name}-main-site-packages-",
                         f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-site-packages-",
                     ]
@@ -129,7 +136,7 @@ class CircleCIJob:
         steps.append(
             {
                 "save_cache": {
-                    "key": f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-pip-" + '{{ checksum "setup.py" }}',
+                    "key": f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-pip-{checksum}",
                     "paths": ["~/.cache/pip"],
                 }
             }
@@ -137,7 +144,7 @@ class CircleCIJob:
         steps.append(
             {
                 "save_cache": {
-                    "key": f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-site-packages-" + '{{ checksum "setup.py" }}',
+                    "key": f"v{self.cache_version}-{self.cache_name}-{cache_branch_prefix}-site-packages-{checksum}",
                     "paths": ["~/.pyenv/versions/"],
                 }
             }
@@ -543,12 +550,13 @@ def create_circleci_config(folder=None):
             test_list = f.read()
     else:
         test_list = []
-    # This means either `setup.py` is modified or it's a nightly run
-    if test_list == "tests":
-        pass
-        # we want to use the (modified) `setup.py` on the branch to compute the checksum for the cache
-        # TODO: how do we compute the checksum of the `setup.py` on the main branch of the common commit with the branch
-        checksum = None
+
+    checksum = None
+    # `setup.py` is not modified
+    if test_list != "tests":
+        # we use `setup.py` on the main branch to compute the checksum for the cache
+        from utils.get_repo_info import get_setup_checksum
+        checksum = get_setup_checksum()
 
     jobs = []
     all_test_file = os.path.join(folder, "test_list.txt")
@@ -632,6 +640,10 @@ def create_circleci_config(folder=None):
         "nightly": {"type": "boolean", "default": False},
         "tests_to_run": {"type": "string", "default": test_list},
     }
+
+    for job in jobs:
+        job.checksum = checksum
+
     config["jobs"] = {j.job_name: j.to_dict() for j in jobs}
     config["workflows"] = {"version": 2, "run_tests": {"jobs": [j.job_name for j in jobs]}}
     with open(os.path.join(folder, "generated_config.yml"), "w") as f:
