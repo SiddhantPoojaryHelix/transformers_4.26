@@ -25,4 +25,5 @@ def get_main_setup_checksum():
 
 
 if __name__ == "__main__":
-    get_main_setup_checksum()
+    checksum = get_main_setup_checksum()
+    print(checksum)
